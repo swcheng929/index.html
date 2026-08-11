@@ -14,12 +14,56 @@
     button:hover { background: #0056b3; }
     .btn-gen { background: #28a745; }
     .btn-gen:hover { background: #218838; }
+    .btn-copy { background: #6f42c1; }
+    .btn-copy:hover { background: #593196; }
     .btn-sync { background: #17a2b8; }
     .btn-edit { background: #ffc107; color: #333; }
     .btn-edit:hover { background: #e0a800; }
     .btn-backup { background: #6c757d; }
     .btn-backup:hover { background: #5a6268; }
-    .account-info { background: #e8f4f8; padding: 10px; border-radius: 4px; margin-top: 8px; }
+    
+    /* 大按鈕樣式 */
+    .btn-copy-large {
+      padding: 10px 20px;
+      font-size: 15px;
+      font-weight: bold;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+    .btn-copy-large:hover { background: #0056b3; }
+
+    .btn-delete-right {
+      padding: 8px 15px;
+      font-size: 14px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      float: right;
+    }
+    .btn-delete-right:hover { background: #bd2130; }
+
+    /* 可點擊的大卡片樣式 */
+    .vault-card {
+      background: white;
+      padding: 15px;
+      margin-bottom: 12px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .vault-card:hover {
+      background: #f8f9fa;
+      border-color: #007bff;
+    }
+
+    .account-info { background: #e8f4f8; padding: 12px; border-radius: 6px; margin-top: 10px; cursor: default; }
     .badge { background: #17a2b8; color: white; padding: 3px 8px; border-radius: 12px; font-size: 12px; margin-left: 6px; display: inline-block; }
     
     .rules-list { list-style: none; padding-left: 5px; margin: 5px 0 15px 0; font-size: 14px; }
@@ -29,29 +73,50 @@
     .rules-list li.invalid::before { content: "○ "; }
     .edit-box { background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 10px; border: 1px solid #ffeeba; }
     .filter-box { background: #e2e8f0; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #cbd5e1; }
+    .clear-both { clear: both; }
+    .btn-group { margin-top: 8px; margin-bottom: 12px; }
   </style>
 </head>
 <body>
 
   <h2>☁️ 雲端同步密碼與資料保險箱</h2>
 
-  <!-- 0. 用戶同步帳號標籤 -->
+  <!-- 1. 帳號驗證與同步區塊 -->
   <div class="box" style="background: #e9ecef;">
-    <h3>同步帳號標籤 (User ID)</h3>
-    <input type="text" id="userId" placeholder="輸入你的專屬同步帳號，例如：alex888"><br>
-    <small style="color: #666;">只要在電腦與手機輸入相同的 User ID 與主密碼，就能存取相同資料！</small>
-  </div>
-
-  <!-- 1. 設定主密碼 -->
-  <div class="box">
-    <h3>第一步：輸入你的主密碼 (開箱鑰匙)</h3>
-    <input type="password" id="masterPassword" placeholder="這是你唯一需要記住的密碼"><br>
+    <label><strong>帳號標籤 (User ID)：</strong></label><br>
+    <input type="text" id="userId" placeholder="例如：swcheng929"><br>
+    
+    <label><strong>Key (主密碼)：</strong></label><br>
+    <input type="password" id="masterPassword" placeholder="解密鑰匙 (主密碼)"><br>
+    
     <button class="btn-sync" onclick="fetchVaultFromCloud()">🔄 從雲端載入/同步資料</button>
   </div>
 
-  <!-- 2. 輸入與加密 -->
+  <!-- 2. 保險箱列表與搜尋過濾器 -->
   <div class="box">
-    <h3>第二步：新增網站帳密或私密資料</h3>
+    <h3>雲端保險箱紀錄</h3>
+    
+    <button class="btn-backup" onclick="exportBackup()">📥 匯出備份檔 (.json)</button>
+    <button class="btn-backup" onclick="document.getElementById('importFile').click()">📤 匯入備份檔</button>
+    <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importBackup(event)">
+    
+    <!-- 關鍵字搜尋與分類篩選工具列 -->
+    <div class="filter-box">
+      <label>🔍 明文即時搜尋 (可搜尋 1/2/3/4 欄)：</label><br>
+      <input type="text" id="searchInput" placeholder="可搜尋類型、名稱、帳號ID或註解 (如: htc, gmail)..." oninput="filterVault()"><br>
+      
+      <label>🗂️ 依類型篩選：</label><br>
+      <select id="categoryFilter" onchange="filterVault()">
+        <option value="ALL">所有類型 (全部顯示)</option>
+      </select>
+    </div>
+
+    <div id="vaultList">請先輸入帳號標籤與 Key，並點擊「從雲端載入/同步資料」。</div>
+  </div>
+
+  <!-- 3. 新增資料區塊 -->
+  <div class="box">
+    <h3>新增網站帳密或私密資料</h3>
     
     <label>1. 類型 (分類)：</label><br>
     <input type="text" id="categoryName" list="categoryOptions" placeholder="請選擇或手動輸入新類型"><br>
@@ -81,7 +146,13 @@
 
     <label>5. 密碼 / 詳細內容 (高強度加密)：</label><br>
     <input type="text" id="secretPassword" placeholder="可手動輸入(支援空格與長地址)或點擊按鈕產生" oninput="checkPasswordStrength()">
-    <button type="button" class="btn-gen" onclick="generateRandomPassword()">🎲 產生強密碼</button><br>
+    
+    <!-- 按鈕並排：產生強密碼 -> 複製密碼 -> 加密並同步至雲端 -->
+    <div class="btn-group">
+      <button type="button" class="btn-gen" onclick="generateRandomPassword()">🎲 產生強密碼</button>
+      <button type="button" class="btn-copy" onclick="copyInputPassword()">📋 複製密碼</button>
+      <button type="button" onclick="saveSecretToCloud()">☁️ 加密並同步至雲端</button>
+    </div>
 
     <ul class="rules-list">
       <li id="rule-upper" class="invalid">Uppercase letter (大寫字母)</li>
@@ -92,30 +163,6 @@
       <li id="rule-repeat" class="invalid">無連續三個相同的字元 (如 aaa, 111)</li>
       <li id="rule-sequential" class="invalid">無連續順序的英文或數字 (如 abc, 123)</li>
     </ul>
-
-    <button onclick="saveSecretToCloud()">☁️ 加密並同步至雲端</button>
-  </div>
-
-  <!-- 3. 保險箱列表與搜尋過濾器 -->
-  <div class="box">
-    <h3>第三步：雲端保險箱紀錄</h3>
-    
-    <button class="btn-backup" onclick="exportBackup()">📥 匯出備份檔 (.json)</button>
-    <button class="btn-backup" onclick="document.getElementById('importFile').click()">📤 匯入備份檔</button>
-    <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importBackup(event)">
-    
-    <!-- 關鍵字搜尋與分類篩選工具列 -->
-    <div class="filter-box">
-      <label>🔍 明文即時搜尋 (可搜尋 1/2/3/4 欄)：</label><br>
-      <input type="text" id="searchInput" placeholder="可搜尋類型、名稱、帳號ID或註解 (如: htc, gmail)..." oninput="filterVault()"><br>
-      
-      <label>🗂️ 依類型篩選：</label><br>
-      <select id="categoryFilter" onchange="filterVault()">
-        <option value="ALL">所有類型 (全部顯示)</option>
-      </select>
-    </div>
-
-    <div id="vaultList">請先輸入 User ID 與主密碼，並點擊「從雲端載入/同步資料」。</div>
   </div>
 
   <script>
@@ -254,6 +301,64 @@
       }
     }
 
+    // 相容電腦與 Android 手機的強效複製函數
+    function copyTextToClipboard(text) {
+      if (!text) {
+        alert("目前的欄位是空的，沒有內容可複製！");
+        return;
+      }
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          alert("已成功複製到剪貼簿！");
+        }).catch(() => {
+          fallbackCopyText(text);
+        });
+      } else {
+        fallbackCopyText(text);
+      }
+    }
+
+    // 針對舊款 Android 瀏覽器或不支援 Clipboard API 的備用機制
+    function fallbackCopyText(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.width = "2em";
+      textArea.style.height = "2em";
+      textArea.style.padding = "0";
+      textArea.style.border = "none";
+      textArea.style.outline = "none";
+      textArea.style.boxShadow = "none";
+      textArea.style.background = "transparent";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          alert("已成功複製到剪貼簿！");
+        } else {
+          alert("複製失敗，請手動選取複製。");
+        }
+      } catch (err) {
+        alert("複製失敗，請手動選取複製。");
+      }
+      document.body.removeChild(textArea);
+    }
+
+    function copyInputPassword() {
+      const secret = document.getElementById("secretPassword").value;
+      copyTextToClipboard(secret);
+    }
+
+    function copyToClipboard(text) {
+      copyTextToClipboard(text);
+    }
+
     async function saveSecretToCloud() {
       const userId = document.getElementById("userId").value;
       const masterPass = document.getElementById("masterPassword").value;
@@ -264,7 +369,7 @@
       const secret = document.getElementById("secretPassword").value;
 
       if (!userId || !masterPass || !site || !account || !secret) {
-        alert("請完整填寫 User ID、主密碼、網頁名稱、帳號/ID 與密碼/內容！");
+        alert("請完整填寫帳號標籤、Key、網頁名稱、帳號/ID 與密碼/內容！");
         return;
       }
 
@@ -317,7 +422,7 @@
       const userId = document.getElementById("userId").value;
 
       if (!userId) {
-        alert("請先輸入 User ID！");
+        alert("請先輸入帳號標籤 (User ID)！");
         return;
       }
 
@@ -364,7 +469,7 @@
     function renderVaultItems(itemsToRender) {
       const listDiv = document.getElementById("vaultList");
       if (vault.length === 0) {
-        listDiv.innerHTML = "目前雲端尚無此 User ID 的資料。";
+        listDiv.innerHTML = "目前雲端尚無此帳號標籤的資料。";
         return;
       }
 
@@ -381,13 +486,12 @@
         const noteDisplay = item.note_name ? `<br><small style="color:#666; font-size: 13px;">📝 註解: ${item.note_name}</small>` : '';
 
         listDiv.innerHTML += `
-          <div style="background: white; padding: 12px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ddd;">
+          <div class="vault-card" onclick="revealSecret(${originalIndex})">
             <strong style="font-size: 16px;">🌐 ${item.site_name}</strong> ${categoryBadge}
             ${accountDisplay}
             ${noteDisplay}<br><br>
-            <button onclick="revealSecret(${originalIndex})">🔓 解密第5欄 (密碼/詳細內容)</button>
-            <button style="background: #dc3545;" onclick="deleteCloudItem(${item.id})">🗑️ 刪除</button>
-            <div id="decrypted-${originalIndex}" class="account-info" style="display: none;"></div>
+            <button style="width:100%; text-align:center; padding:10px; font-size:14px; font-weight:bold;">🔓 點擊此處解密查看內容</button>
+            <div id="decrypted-${originalIndex}" class="account-info" style="display: none;" onclick="event.stopPropagation()"></div>
           </div>
         `;
       });
@@ -398,7 +502,7 @@
       const item = vault[index];
 
       if (!masterPass) {
-        alert("請先輸入主密碼！");
+        alert("請先在最上方輸入 Key (主密碼)！");
         return;
       }
 
@@ -417,13 +521,20 @@
         const infoDiv = document.getElementById(`decrypted-${index}`);
         infoDiv.style.display = "block";
         infoDiv.innerHTML = `
-          <strong>密碼 / 詳細內容：</strong> ${secretText} 
-          <button onclick="copyToClipboard('${secretText}')" style="padding: 2px 6px; font-size: 12px;">複製內容</button><br><br>
-          <button class="btn-edit" onclick="showEditForm(${index}, '${item.category_name || ''}', '${item.site_name || ''}', '${item.account_name || ''}', '${item.note_name || ''}', '${secretText}')">✏️ 編輯這筆紀錄</button>
+          <div style="font-size: 16px; margin-bottom: 12px;">
+            <strong>密碼 / 詳細內容：</strong> 
+            <span style="font-family: monospace; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold; font-size: 16px;">${secretText}</span>
+            <button class="btn-copy-large" onclick="copyToClipboard('${secretText}')">📋 複製內容</button>
+          </div>
+          <div style="margin-top: 15px;">
+            <button class="btn-edit" onclick="showEditForm(${index}, '${item.category_name || ''}', '${item.site_name || ''}', '${item.account_name || ''}', '${item.note_name || ''}', '${secretText}')">✏️ 編輯這筆紀錄</button>
+            <button class="btn-delete-right" onclick="deleteCloudItem(${item.id})">🗑️ 刪除這筆紀錄</button>
+            <div class="clear-both"></div>
+          </div>
           <div id="edit-box-${index}" class="edit-box" style="display: none;"></div>
         `;
       } catch (e) {
-        alert("解密失敗！主密碼不正確。");
+        alert("解密失敗！Key (主密碼) 不正確。");
       }
     }
 
@@ -520,17 +631,14 @@
       }
     }
 
-    function copyToClipboard(text) {
-      navigator.clipboard.writeText(text);
-      alert("已複製到剪貼簿！");
-    }
-
     async function deleteCloudItem(id) {
-      if (!confirm("確定要刪除這筆資料嗎？")) return;
+      if (!confirm("⚠️ 警告：確定要永久刪除這筆紀錄嗎？刪除後無法恢復喔！")) return;
+      
       const { error } = await supabaseClient.from('password_vault').delete().eq('id', id);
       if (error) {
         alert("刪除失敗：" + error.message);
       } else {
+        alert("已成功刪除該筆紀錄！");
         fetchVaultFromCloud();
       }
     }
@@ -538,7 +646,7 @@
     function exportBackup() {
       const userId = document.getElementById("userId").value;
       if (!userId) {
-        alert("請先輸入 User ID 再進行匯出！");
+        alert("請先輸入帳號標籤 (User ID) 再進行匯出！");
         return;
       }
       if (vault.length === 0) {
@@ -559,7 +667,7 @@
     function importBackup(event) {
       const userId = document.getElementById("userId").value;
       if (!userId) {
-        alert("請先輸入你的 User ID，再選擇要匯入的備份檔！");
+        alert("請先輸入你的帳號標籤 (User ID)，再選擇要匯入的備份檔！");
         return;
       }
 
