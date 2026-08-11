@@ -24,15 +24,15 @@
     
     /* 大按鈕樣式 */
     .btn-copy-large {
-      padding: 10px 20px;
-      font-size: 15px;
+      padding: 6px 14px;
+      font-size: 14px;
       font-weight: bold;
       background: #007bff;
       color: white;
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      margin-left: 10px;
+      margin-left: 8px;
     }
     .btn-copy-large:hover { background: #0056b3; }
 
@@ -75,6 +75,7 @@
     .filter-box { background: #e2e8f0; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #cbd5e1; }
     .clear-both { clear: both; }
     .btn-group { margin-top: 8px; margin-bottom: 12px; }
+    .info-row { font-size: 15px; margin-bottom: 10px; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
   </style>
 </head>
 <body>
@@ -301,10 +302,9 @@
       }
     }
 
-    // 相容電腦與 Android 手機的強效複製函數
     function copyTextToClipboard(text) {
       if (!text) {
-        alert("目前的欄位是空的，沒有內容可複製！");
+        alert("內容是空的，無法複製！");
         return;
       }
 
@@ -319,7 +319,6 @@
       }
     }
 
-    // 針對舊款 Android 瀏覽器或不支援 Clipboard API 的備用機制
     function fallbackCopyText(text) {
       const textArea = document.createElement("textarea");
       textArea.value = text;
@@ -521,11 +520,20 @@
         const infoDiv = document.getElementById(`decrypted-${index}`);
         infoDiv.style.display = "block";
         infoDiv.innerHTML = `
-          <div style="font-size: 16px; margin-bottom: 12px;">
-            <strong>密碼 / 詳細內容：</strong> 
-            <span style="font-family: monospace; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold; font-size: 16px;">${secretText}</span>
-            <button class="btn-copy-large" onclick="copyToClipboard('${secretText}')">📋 複製內容</button>
+          <!-- 帳號與複製帳號按鈕 -->
+          <div class="info-row">
+            <strong>👤 帳號 / ID：</strong> 
+            <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${item.account_name || '無'}</span>
+            ${item.account_name ? `<button class="btn-copy-large" style="background:#17a2b8;" onclick="copyToClipboard('${item.account_name}')">📋 複製帳號</button>` : ''}
           </div>
+
+          <!-- 密碼與複製內容按鈕 -->
+          <div class="info-row">
+            <strong>🔑 密碼 / 詳細內容：</strong> 
+            <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${secretText}</span>
+            <button class="btn-copy-large" onclick="copyToClipboard('${secretText}')">📋 複製密碼</button>
+          </div>
+
           <div style="margin-top: 15px;">
             <button class="btn-edit" onclick="showEditForm(${index}, '${item.category_name || ''}', '${item.site_name || ''}', '${item.account_name || ''}', '${item.note_name || ''}', '${secretText}')">✏️ 編輯這筆紀錄</button>
             <button class="btn-delete-right" onclick="deleteCloudItem(${item.id})">🗑️ 刪除這筆紀錄</button>
