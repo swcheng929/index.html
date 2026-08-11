@@ -22,6 +22,31 @@
     .btn-backup { background: #6c757d; }
     .btn-backup:hover { background: #5a6268; }
     
+    /* User ID 標籤樣式 */
+    .user-tag {
+      background: #6c757d;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      margin-right: 5px;
+      margin-bottom: 5px;
+      cursor: pointer;
+      display: inline-block;
+    }
+    .user-tag:hover { background: #495057; }
+    .btn-clear-user {
+      background: #dc3545;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-block;
+      margin-left: 10px;
+    }
+    .btn-clear-user:hover { background: #bd2130; }
+
     /* 大按鈕樣式 */
     .btn-copy-large {
       padding: 6px 14px;
@@ -87,6 +112,13 @@
     <label><strong>帳號標籤 (User ID)：</strong></label><br>
     <input type="text" id="userId" placeholder="例如：swcheng929"><br>
     
+    <!-- 歷史常用 User ID 標籤清單 -->
+    <div style="margin-bottom: 10px;">
+      <span style="font-size: 13px; color: #555;">常用標籤：</span>
+      <span id="userTagList">尚無記錄</span>
+      <span class="btn-clear-user" onclick="clearCurrentAllCloudData()">🗑️ 刪除此 User ID 雲端全部資料</span>
+    </div>
+
     <label><strong>Key (主密碼)：</strong></label><br>
     <input type="password" id="masterPassword" placeholder="解密鑰匙 (主密碼)"><br>
     
@@ -180,6 +212,84 @@
       "影音娛樂", "購物", "旅遊網站(航司/飯店/住房網/其他)", 
       "個人資料、地址備忘 或 重要證件", "其他"
     ]);
+
+    // 初始化讀取 localUserIds
+    window.addEventListener('DOMContentLoaded', () => {
+      renderUserTags();
+    });
+
+    function getStoredUserIds() {
+      const stored = localStorage.getItem('saved_user_ids');
+      return stored ? JSON.parse(stored) : ["swcheng929"];
+    }
+
+    function addStoredUserId(userId) {
+      if (!userId) return;
+      userId = userId.trim();
+      let ids = getStoredUserIds();
+      if (!ids.includes(userId)) {
+        ids.push(userId);
+        localStorage.setItem('saved_user_ids', JSON.stringify(ids));
+        renderUserTags();
+      }
+    }
+
+    function removeStoredUserId(userId) {
+      let ids = getStoredUserIds();
+      ids = ids.filter(id => id !== userId);
+      localStorage.setItem('saved_user_ids', JSON.stringify(ids));
+      renderUserTags();
+    }
+
+    function renderUserTags() {
+      const ids = getStoredUserIds();
+      const container = document.getElementById("userTagList");
+      if (ids.length === 0) {
+        container.innerHTML = "<span style='color:#999;'>尚無記錄</span>";
+        return;
+      }
+
+      container.innerHTML = "";
+      ids.forEach(id => {
+        const span = document.createElement("span");
+        span.className = "user-tag";
+        span.textContent = id;
+        span.onclick = () => {
+          document.getElementById("userId").value = id;
+        };
+        container.appendChild(span);
+      });
+    }
+
+    async function clearCurrentAllCloudData() {
+      const userId = document.getElementById("userId").value.trim();
+      if (!userId) {
+        alert("請先輸入或點選你想清空的 User ID！");
+        return;
+      }
+
+      const confirmInput = prompt(`⚠️ 高風險警告：您確定要「徹底刪除」User ID 【${userId}】在雲端的所有資料嗎？\n\n這將無法復原！若確定刪除，請在下方輸入「${userId}」進行確認：`);
+
+      if (confirmInput !== userId) {
+        alert("輸入名稱不吻合，取消刪除程序。");
+        return;
+      }
+
+      const { error } = await supabaseClient
+        .from('password_vault')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) {
+        alert("刪除雲端資料失敗：" + error.message);
+      } else {
+        alert(`已成功清空 User ID 【${userId}】底下所有的雲端密碼資料！`);
+        removeStoredUserId(userId);
+        document.getElementById("userId").value = "";
+        vault = [];
+        renderVaultItems([]);
+      }
+    }
 
     function checkPasswordStrength() {
       const pwd = document.getElementById("secretPassword").value;
@@ -372,6 +482,7 @@
         return;
       }
 
+      addStoredUserId(userId);
       addCategoryToDatalist(category);
       addAccountToDatalist(account);
 
@@ -424,6 +535,8 @@
         alert("請先輸入帳號標籤 (User ID)！");
         return;
       }
+
+      addStoredUserId(userId);
 
       const { data, error } = await supabaseClient
         .from('password_vault')
