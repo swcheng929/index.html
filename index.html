@@ -96,11 +96,15 @@
     .rules-list li.valid { color: #28a745; font-weight: bold; }
     .rules-list li.valid::before { content: "✓ "; }
     .rules-list li.invalid::before { content: "○ "; }
-    .edit-box { background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 10px; border: 1px solid #ffeeba; }
+    .edit-box { background: #fff3cd; padding: 12px; border-radius: 6px; margin-top: 10px; border: 1px solid #ffeeba; }
     .filter-box { background: #e2e8f0; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #cbd5e1; }
     .clear-both { clear: both; }
     .btn-group { margin-top: 8px; margin-bottom: 12px; }
     .info-row { font-size: 15px; margin-bottom: 10px; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+    
+    /* 舊密碼區塊樣式 */
+    .history-box { background: #e9ecef; padding: 8px 12px; border-radius: 4px; margin-top: 6px; font-size: 13px; }
+    .history-item { margin: 4px 0; font-family: monospace; display: flex; align-items: center; justify-content: space-between; }
   </style>
 </head>
 <body>
@@ -177,12 +181,11 @@
     <label>4. 註解 / 備註：</label><br>
     <input type="text" id="noteName" placeholder="例如：次要備份帳號、公司用、郵遞區號242等"><br>
 
-    <label>5. 密碼 / 詳細內容 (高強度加密)：</label><br>
+    <label>5. 密碼 (高強度加密)：</label><br>
     <input type="text" id="secretPassword" placeholder="可手動輸入(支援空格與長地址)或點擊按鈕產生" oninput="checkPasswordStrength()">
     
-    <!-- 按鈕並排：產生強密碼 -> 複製密碼 -> 加密並同步至雲端 -->
     <div class="btn-group">
-      <button type="button" class="btn-gen" onclick="generateRandomPassword()">🎲 產生強密碼</button>
+      <button type="button" class="btn-gen" onclick="generateRandomPassword('secretPassword')">🎲 產生強密碼</button>
       <button type="button" class="btn-copy" onclick="copyInputPassword()">📋 複製密碼</button>
       <button type="button" onclick="saveSecretToCloud()">☁️ 加密並同步至雲端</button>
     </div>
@@ -213,7 +216,6 @@
       "個人資料、地址備忘 或 重要證件", "其他"
     ]);
 
-    // 初始化讀取 localUserIds
     window.addEventListener('DOMContentLoaded', () => {
       renderUserTags();
     });
@@ -336,7 +338,7 @@
       document.getElementById(elementId).className = isValid ? "valid" : "invalid";
     }
 
-    function generateRandomPassword() {
+    function generateRandomPassword(targetInputId = 'secretPassword') {
       let password = "";
       let isValid = false;
 
@@ -363,8 +365,16 @@
         }
 
         password = pwdArr.join('');
-        document.getElementById("secretPassword").value = password;
-        isValid = checkPasswordStrength();
+        const targetInput = document.getElementById(targetInputId);
+        if (targetInput) {
+          targetInput.value = password;
+        }
+        
+        if (targetInputId === 'secretPassword') {
+          isValid = checkPasswordStrength();
+        } else {
+          isValid = true;
+        }
       }
     }
 
@@ -478,7 +488,7 @@
       const secret = document.getElementById("secretPassword").value;
 
       if (!userId || !masterPass || !site || !account || !secret) {
-        alert("請完整填寫帳號標籤、Key、網頁名稱、帳號/ID 與密碼/內容！");
+        alert("請完整填寫帳號標籤、Key、網頁名稱、帳號/ID 與密碼！");
         return;
       }
 
@@ -486,8 +496,10 @@
       addCategoryToDatalist(category);
       addAccountToDatalist(account);
 
+      // 新紀錄歷史預設為空陣列
       const dataToEncrypt = JSON.stringify({ 
-        password: secret 
+        password: secret,
+        history: [] 
       });
 
       const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -628,7 +640,12 @@
 
         const decryptedJson = JSON.parse(new TextDecoder().decode(decryptedBuffer));
         
-        const secretText = decryptedJson.password || "";
+        const secretText = decryptedJson.password || decryptedJson || "";
+        const historyList = decryptedJson.history || [];
+
+        // 暫存解密結果於物料中
+        item.currentPassword = secretText;
+        item.currentHistory = historyList;
 
         const infoDiv = document.getElementById(`decrypted-${index}`);
         infoDiv.style.display = "block";
@@ -642,13 +659,13 @@
 
           <!-- 密碼與複製內容按鈕 -->
           <div class="info-row">
-            <strong>🔑 密碼 / 詳細內容：</strong> 
+            <strong>🔑 密碼：</strong> 
             <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${secretText}</span>
             <button class="btn-copy-large" onclick="copyToClipboard('${secretText}')">📋 複製密碼</button>
           </div>
 
           <div style="margin-top: 15px;">
-            <button class="btn-edit" onclick="showEditForm(${index}, '${item.category_name || ''}', '${item.site_name || ''}', '${item.account_name || ''}', '${item.note_name || ''}', '${secretText}')">✏️ 編輯這筆紀錄</button>
+            <button class="btn-edit" onclick="showEditForm(${index}, '${item.category_name || ''}', '${item.site_name || ''}', '${item.account_name || ''}', '${item.note_name || ''}')">✏️ 編輯這筆紀錄</button>
             <button class="btn-delete-right" onclick="deleteCloudItem(${item.id})">🗑️ 刪除這筆紀錄</button>
             <div class="clear-both"></div>
           </div>
@@ -659,43 +676,66 @@
       }
     }
 
-    function refreshCategoryFilterList() {
-      const filterSelect = document.getElementById("categoryFilter");
-      const currentValue = filterSelect.value;
-      const categories = new Set();
-
-      vault.forEach(item => {
-        if (item.category_name) {
-          categories.add(item.category_name);
-        }
-      });
-
-      filterSelect.innerHTML = '<option value="ALL">所有類型 (全部顯示)</option>';
-      categories.forEach(cat => {
-        const option = document.createElement("option");
-        option.value = cat;
-        option.textContent = cat;
-        filterSelect.appendChild(option);
-      });
-
-      filterSelect.value = currentValue;
+    function toggleHistoryDisplay(index) {
+      const historyDiv = document.getElementById(`history-box-${index}`);
+      if (historyDiv) {
+        historyDiv.style.display = (historyDiv.style.display === "none") ? "block" : "none";
+      }
     }
 
-    function showEditForm(index, currentCat, currentSite, currentAcc, currentNote, currentPass) {
+    function showEditForm(index, currentCat, currentSite, currentAcc, currentNote) {
       const editDiv = document.getElementById(`edit-box-${index}`);
+      const item = vault[index];
+      const currentPass = item.currentPassword || "";
+      const historyList = item.currentHistory || [];
+
       editDiv.style.display = editDiv.style.display === "none" ? "block" : "none";
+      
+      // 構建前三次舊密碼的 HTML
+      let historyHtml = "";
+      if (historyList.length === 0) {
+        historyHtml = "<div style='color: #888;'>目前無舊密碼紀錄</div>";
+      } else {
+        historyList.forEach((oldPwd, hIdx) => {
+          historyHtml += `
+            <div class="history-item">
+              <span>第 ${hIdx + 1} 次舊密碼: <strong>${oldPwd}</strong></span>
+              <button onclick="copyToClipboard('${oldPwd}')" style="padding: 2px 6px; font-size: 11px;">複製</button>
+            </div>
+          `;
+        });
+      }
+
       editDiv.innerHTML = `
         <h4>修改這筆紀錄：</h4>
         <label>1. 新類型：</label><br>
         <input type="text" id="editCat-${index}" value="${currentCat}" list="categoryOptions"><br>
+        
         <label>2. 新名稱/標題：</label><br>
         <input type="text" id="editSite-${index}" value="${currentSite}"><br>
+        
         <label>3. 新帳號/ID：</label><br>
         <input type="text" id="editAcc-${index}" value="${currentAcc}" list="accountOptions"><br>
+        
         <label>4. 新註解/備註：</label><br>
         <input type="text" id="editNote-${index}" value="${currentNote}"><br>
-        <label>5. 新密碼/詳細內容：</label><br>
+        
+        <label>5. 密碼：</label><br>
         <input type="text" id="editPass-${index}" value="${currentPass}"><br>
+        
+        <!-- 增加「更新強密碼」與「顯示前三次舊密碼」按鈕 -->
+        <div style="margin-bottom: 12px;">
+          <button type="button" class="btn-gen" onclick="generateRandomPassword('editPass-${index}')">🎲 更新強密碼</button>
+          <button type="button" class="btn-backup" onclick="toggleHistoryDisplay(${index})">📜 顯示前3次舊密碼紀錄</button>
+        </div>
+
+        <!-- 舊密碼紀錄隱藏區塊 -->
+        <div id="history-box-${index}" class="history-box" style="display: none;">
+          <strong>前 3 次舊密碼紀錄：</strong>
+          ${historyHtml}
+        </div>
+
+        <br>
         <button onclick="updateCloudItem(${index})">💾 重新加密並儲存修改</button>
       `;
     }
@@ -718,7 +758,23 @@
       addCategoryToDatalist(newCat);
       addAccountToDatalist(newAcc);
 
-      const dataToEncrypt = JSON.stringify({ password: newPass });
+      // 檢查密碼是否修改，若修改則推進歷史紀錄（最多留前 3 次）
+      let historyList = item.currentHistory || [];
+      const oldPass = item.currentPassword;
+
+      if (oldPass && oldPass !== newPass) {
+        // 將舊密碼放在歷史最前面
+        historyList.unshift(oldPass);
+        // 只保留前 3 次舊密碼
+        if (historyList.length > 3) {
+          historyList = historyList.slice(0, 3);
+        }
+      }
+
+      const dataToEncrypt = JSON.stringify({ 
+        password: newPass,
+        history: historyList
+      });
 
       const salt = crypto.getRandomValues(new Uint8Array(16));
       const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -747,9 +803,31 @@
       if (error) {
         alert("更新失敗：" + error.message);
       } else {
-        alert("修改成功！已重新加密並儲存至雲端。");
+        alert("修改成功！舊密碼已存入歷史紀錄，並已將新資料重新加密儲存至雲端。");
         fetchVaultFromCloud();
       }
+    }
+
+    function refreshCategoryFilterList() {
+      const filterSelect = document.getElementById("categoryFilter");
+      const currentValue = filterSelect.value;
+      const categories = new Set();
+
+      vault.forEach(item => {
+        if (item.category_name) {
+          categories.add(item.category_name);
+        }
+      });
+
+      filterSelect.innerHTML = '<option value="ALL">所有類型 (全部顯示)</option>';
+      categories.forEach(cat => {
+        const option = document.createElement("option");
+        option.value = cat;
+        option.textContent = cat;
+        filterSelect.appendChild(option);
+      });
+
+      filterSelect.value = currentValue;
     }
 
     async function deleteCloudItem(id) {
