@@ -14,6 +14,8 @@
     button:hover { background: #0056b3; }
     .btn-gen { background: #28a745; }
     .btn-gen:hover { background: #218838; }
+    .btn-gen-med { background: #fd7e14; }
+    .btn-gen-med:hover { background: #e8590c; }
     .btn-copy { background: #6f42c1; }
     .btn-copy:hover { background: #593196; }
     .btn-sync { background: #17a2b8; }
@@ -184,8 +186,10 @@
     <label>5. 密碼 (高強度加密)：</label><br>
     <input type="text" id="secretPassword" placeholder="可手動輸入(支援空格與長地址)或點擊按鈕產生" oninput="checkPasswordStrength()">
     
+    <!-- 按鈕並排：產生強密碼 -> 產生中強密碼 -> 複製密碼 -> 加密並同步至雲端 -->
     <div class="btn-group">
       <button type="button" class="btn-gen" onclick="generateRandomPassword('secretPassword')">🎲 產生強密碼</button>
+      <button type="button" class="btn-gen-med" onclick="generateMediumPassword('secretPassword')">🎲 產生中強密碼</button>
       <button type="button" class="btn-copy" onclick="copyInputPassword()">📋 複製密碼</button>
       <button type="button" onclick="saveSecretToCloud()">☁️ 加密並同步至雲端</button>
     </div>
@@ -338,6 +342,7 @@
       document.getElementById(elementId).className = isValid ? "valid" : "invalid";
     }
 
+    // 1. 產生強密碼 (含特殊字元，16字元)
     function generateRandomPassword(targetInputId = 'secretPassword') {
       let password = "";
       let isValid = false;
@@ -375,6 +380,41 @@
         } else {
           isValid = true;
         }
+      }
+    }
+
+    // 2. 產生中強密碼 (只限大小寫英文+數字，長度剛好10字元)
+    function generateMediumPassword(targetInputId = 'secretPassword') {
+      const uppers = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      const lowers = "abcdefghijklmnopqrstuvwxyz";
+      const numbers = "0123456789";
+      const allChars = uppers + lowers + numbers;
+
+      let pwdArr = [];
+      // 確保至少包含大寫、小寫與數字各一個
+      pwdArr.push(uppers[getRandomInt(uppers.length)]);
+      pwdArr.push(lowers[getRandomInt(lowers.length)]);
+      pwdArr.push(numbers[getRandomInt(numbers.length)]);
+
+      // 補滿剩餘的 7 個字元，總長度達到 10 字元
+      for (let i = 3; i < 10; i++) {
+        pwdArr.push(allChars[getRandomInt(allChars.length)]);
+      }
+
+      // 打亂陣列順序
+      for (let i = pwdArr.length - 1; i > 0; i--) {
+        const j = getRandomInt(i + 1);
+        [pwdArr[i], pwdArr[j]] = [pwdArr[j], pwdArr[i]];
+      }
+
+      const password = pwdArr.join('');
+      const targetInput = document.getElementById(targetInputId);
+      if (targetInput) {
+        targetInput.value = password;
+      }
+
+      if (targetInputId === 'secretPassword') {
+        checkPasswordStrength();
       }
     }
 
@@ -496,7 +536,6 @@
       addCategoryToDatalist(category);
       addAccountToDatalist(account);
 
-      // 新紀錄歷史預設為空陣列
       const dataToEncrypt = JSON.stringify({ 
         password: secret,
         history: [] 
@@ -643,7 +682,6 @@
         const secretText = decryptedJson.password || decryptedJson || "";
         const historyList = decryptedJson.history || [];
 
-        // 暫存解密結果於物料中
         item.currentPassword = secretText;
         item.currentHistory = historyList;
 
@@ -691,7 +729,6 @@
 
       editDiv.style.display = editDiv.style.display === "none" ? "block" : "none";
       
-      // 構建前三次舊密碼的 HTML
       let historyHtml = "";
       if (historyList.length === 0) {
         historyHtml = "<div style='color: #888;'>目前無舊密碼紀錄</div>";
@@ -723,9 +760,10 @@
         <label>5. 密碼：</label><br>
         <input type="text" id="editPass-${index}" value="${currentPass}"><br>
         
-        <!-- 增加「更新強密碼」與「顯示前三次舊密碼」按鈕 -->
+        <!-- 包含「更新強密碼」、「更新中強密碼」與「顯示舊密碼」按鈕 -->
         <div style="margin-bottom: 12px;">
           <button type="button" class="btn-gen" onclick="generateRandomPassword('editPass-${index}')">🎲 更新強密碼</button>
+          <button type="button" class="btn-gen-med" onclick="generateMediumPassword('editPass-${index}')">🎲 更新中強密碼</button>
           <button type="button" class="btn-backup" onclick="toggleHistoryDisplay(${index})">📜 顯示前3次舊密碼紀錄</button>
         </div>
 
@@ -758,14 +796,11 @@
       addCategoryToDatalist(newCat);
       addAccountToDatalist(newAcc);
 
-      // 檢查密碼是否修改，若修改則推進歷史紀錄（最多留前 3 次）
       let historyList = item.currentHistory || [];
       const oldPass = item.currentPassword;
 
       if (oldPass && oldPass !== newPass) {
-        // 將舊密碼放在歷史最前面
         historyList.unshift(oldPass);
-        // 只保留前 3 次舊密碼
         if (historyList.length > 3) {
           historyList = historyList.slice(0, 3);
         }
