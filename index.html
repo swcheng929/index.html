@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>雲端同步密碼與資料保險箱</title>
+  <!-- 引入 Supabase 官方 SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
@@ -112,10 +113,12 @@
 
   <h2>☁️ 雲端同步密碼與資料保險箱</h2>
 
+  <!-- 1. 帳號驗證與同步區塊 -->
   <div class="box" style="background: #e9ecef;">
     <label><strong>帳號標籤 (User ID)：</strong></label><br>
     <input type="text" id="userId" placeholder="例如：swcheng929"><br>
     
+    <!-- 歷史常用 User ID 標籤清單 -->
     <div style="margin-bottom: 10px;">
       <span style="font-size: 13px; color: #555;">常用標籤：</span>
       <span id="userTagList">尚無記錄</span>
@@ -128,6 +131,7 @@
     <button class="btn-sync" onclick="fetchVaultFromCloud()">🔄 從雲端載入/同步資料</button>
   </div>
 
+  <!-- 2. 保險箱列表與搜尋過濾器 -->
   <div class="box">
     <h3>雲端保險箱紀錄</h3>
     
@@ -135,6 +139,7 @@
     <button class="btn-backup" onclick="document.getElementById('importFile').click()">📤 匯入備份檔</button>
     <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importBackup(event)">
     
+    <!-- 關鍵字搜尋與分類篩選工具列 -->
     <div class="filter-box">
       <label>🔍 明文即時搜尋 (可搜尋 1/2/3/4 欄)：</label><br>
       <input type="text" id="searchInput" placeholder="可搜尋類型、名稱、帳號ID或註解 (如: htc, gmail)..." oninput="filterVault()"><br>
@@ -148,6 +153,7 @@
     <div id="vaultList">請先輸入帳號標籤與 Key，並點擊「從雲端載入/同步資料」。</div>
   </div>
 
+  <!-- 3. 新增資料區塊 -->
   <div class="box">
     <h3>新增網站帳密或私密資料</h3>
     
@@ -171,7 +177,8 @@
     <label>3. 帳號 / ID：</label><br>
     <input type="text" id="accountName" list="accountOptions" placeholder="請選擇常用帳號或手動輸入新帳號/ID"><br>
     <datalist id="accountOptions">
-      </datalist>
+      <!-- 系統會自動將歷史輸入過的帳號新增至這裡 -->
+    </datalist>
 
     <label>4. 註解 / 備註：</label><br>
     <input type="text" id="noteName" placeholder="例如：次要備份帳號、公司用、郵遞區號242等"><br>
@@ -179,6 +186,7 @@
     <label>5. 密碼 (高強度加密)：</label><br>
     <input type="text" id="secretPassword" placeholder="可手動輸入(支援空格與長地址)或點擊按鈕產生" oninput="checkPasswordStrength()">
     
+    <!-- 按鈕並排：產生強密碼 -> 產生中強密碼 -> 複製密碼 -> 加密並同步至雲端 -->
     <div class="btn-group">
       <button type="button" class="btn-gen" onclick="generateRandomPassword('secretPassword')">🎲 產生強密碼</button>
       <button type="button" class="btn-gen-med" onclick="generateMediumPassword('secretPassword')">🎲 產生中強密碼</button>
@@ -190,8 +198,8 @@
       <li id="rule-upper" class="invalid">Uppercase letter (大寫字母)</li>
       <li id="rule-lower" class="invalid">Lowercase letter (小寫字母)</li>
       <li id="rule-number" class="invalid">Number (數字)</li>
-      <li id="rule-special" class="invalid">Special character (!@#$%)</li>
-      <li id="rule-length" class="invalid">12 characters or more (至少 12 位數)</li>
+      <li id="rule-special" class="invalid">Special character (@!#$%*)</li>
+      <li id="rule-length" class="invalid">8 characters or more (至少 8 位數)</li>
       <li id="rule-repeat" class="invalid">無連續三個相同的字元 (如 aaa, 111)</li>
       <li id="rule-sequential" class="invalid">無連續順序的英文或數字 (如 abc, 123)</li>
     </ul>
@@ -295,8 +303,8 @@
       const hasUpper = /[A-Z]/.test(pwd);
       const hasLower = /[a-z]/.test(pwd);
       const hasNumber = /[0-9]/.test(pwd);
-      const hasSpecial = /[!@#$%]/.test(pwd); // 僅限 !@#$% 特殊字元
-      const hasLength = pwd.length >= 12;      // 長度至少 12 位
+      const hasSpecial = /[@!#$%*]/.test(pwd);
+      const hasLength = pwd.length >= 8;
       const hasNoRepeat = !/(.)\1\1/.test(pwd) && pwd.length > 0;
       const hasNoSequential = !checkSequential(pwd) && pwd.length > 0;
 
@@ -334,7 +342,7 @@
       document.getElementById(elementId).className = isValid ? "valid" : "invalid";
     }
 
-    // 1. 產生強密碼 (含 !@#$% 特殊字元，長度 12 字元)
+    // 1. 產生強密碼 (符號僅限制為 @!#$%*，16字元)
     function generateRandomPassword(targetInputId = 'secretPassword') {
       let password = "";
       let isValid = false;
@@ -343,7 +351,7 @@
         const uppers = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         const lowers = "abcdefghijklmnopqrstuvwxyz";
         const numbers = "0123456789";
-        const specials = "!@#$%"; // 限這 5 個特殊字元
+        const specials = "@!#$%*";
         const allChars = uppers + lowers + numbers + specials;
 
         let pwdArr = [];
@@ -352,8 +360,7 @@
         pwdArr.push(numbers[getRandomInt(numbers.length)]);
         pwdArr.push(specials[getRandomInt(specials.length)]);
 
-        // 補滿剩餘的 8 個字元，使總長度達到 12 字元
-        for (let i = 4; i < 12; i++) {
+        for (let i = 4; i < 16; i++) {
           pwdArr.push(allChars[getRandomInt(allChars.length)]);
         }
 
@@ -376,7 +383,7 @@
       }
     }
 
-    // 2. 產生中強密碼 (只限大小寫英文+數字，長度 10 字元)
+    // 2. 產生中強密碼 (只限大小寫英文+數字，長度剛好10字元)
     function generateMediumPassword(targetInputId = 'secretPassword') {
       const uppers = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
       const lowers = "abcdefghijklmnopqrstuvwxyz";
@@ -384,17 +391,14 @@
       const allChars = uppers + lowers + numbers;
 
       let pwdArr = [];
-      // 確保至少包含大寫、小寫與數字各一個
       pwdArr.push(uppers[getRandomInt(uppers.length)]);
       pwdArr.push(lowers[getRandomInt(lowers.length)]);
       pwdArr.push(numbers[getRandomInt(numbers.length)]);
 
-      // 補滿剩餘的 7 個字元，總長度達到 10 字元
       for (let i = 3; i < 10; i++) {
         pwdArr.push(allChars[getRandomInt(allChars.length)]);
       }
 
-      // 打亂陣列順序
       for (let i = pwdArr.length - 1; i > 0; i--) {
         const j = getRandomInt(i + 1);
         [pwdArr[i], pwdArr[j]] = [pwdArr[j], pwdArr[i]];
@@ -681,12 +685,14 @@
         const infoDiv = document.getElementById(`decrypted-${index}`);
         infoDiv.style.display = "block";
         infoDiv.innerHTML = `
+          <!-- 帳號與複製帳號按鈕 -->
           <div class="info-row">
             <strong>👤 帳號 / ID：</strong> 
             <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${item.account_name || '無'}</span>
             ${item.account_name ? `<button class="btn-copy-large" style="background:#17a2b8;" onclick="copyToClipboard('${item.account_name}')">📋 複製帳號</button>` : ''}
           </div>
 
+          <!-- 密碼與複製內容按鈕 -->
           <div class="info-row">
             <strong>🔑 密碼：</strong> 
             <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${secretText}</span>
@@ -751,12 +757,14 @@
         <label>5. 密碼：</label><br>
         <input type="text" id="editPass-${index}" value="${currentPass}"><br>
         
+        <!-- 包含「更新強密碼」、「更新中強密碼」與「顯示舊密碼」按鈕 -->
         <div style="margin-bottom: 12px;">
           <button type="button" class="btn-gen" onclick="generateRandomPassword('editPass-${index}')">🎲 更新強密碼</button>
           <button type="button" class="btn-gen-med" onclick="generateMediumPassword('editPass-${index}')">🎲 更新中強密碼</button>
           <button type="button" class="btn-backup" onclick="toggleHistoryDisplay(${index})">📜 顯示前3次舊密碼紀錄</button>
         </div>
 
+        <!-- 舊密碼紀錄隱藏區塊 -->
         <div id="history-box-${index}" class="history-box" style="display: none;">
           <strong>前 3 次舊密碼紀錄：</strong>
           ${historyHtml}
@@ -802,4 +810,141 @@
 
       const salt = crypto.getRandomValues(new Uint8Array(16));
       const iv = crypto.getRandomValues(new Uint8Array(12));
-      const
+      const key = await getMasterKey(masterPass, salt);
+
+      const enc = new TextEncoder();
+      const encryptedBuffer = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, enc.encode(dataToEncrypt));
+
+      const ciphertextArray = Array.from(new Uint8Array(encryptedBuffer));
+      const ciphertextHex = ciphertextArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      const { error } = await supabaseClient
+        .from('password_vault')
+        .update({
+          category_name: newCat,
+          site_name: newSite,
+          account_name: newAcc,
+          note_name: newNote,
+          ciphertext_hex: ciphertextHex,
+          ciphertext_array: ciphertextArray,
+          salt: Array.from(salt),
+          iv: Array.from(iv)
+        })
+        .eq('id', item.id);
+
+      if (error) {
+        alert("更新失敗：" + error.message);
+      } else {
+        alert("修改成功！舊密碼已存入歷史紀錄，並已將新資料重新加密儲存至雲端。");
+        fetchVaultFromCloud();
+      }
+    }
+
+    function refreshCategoryFilterList() {
+      const filterSelect = document.getElementById("categoryFilter");
+      const currentValue = filterSelect.value;
+      const categories = new Set();
+
+      vault.forEach(item => {
+        if (item.category_name) {
+          categories.add(item.category_name);
+        }
+      });
+
+      filterSelect.innerHTML = '<option value="ALL">所有類型 (全部顯示)</option>';
+      categories.forEach(cat => {
+        const option = document.createElement("option");
+        option.value = cat;
+        option.textContent = cat;
+        filterSelect.appendChild(option);
+      });
+
+      filterSelect.value = currentValue;
+    }
+
+    async function deleteCloudItem(id) {
+      if (!confirm("⚠️ 警告：確定要永久刪除這筆紀錄嗎？刪除後無法恢復喔！")) return;
+      
+      const { error } = await supabaseClient.from('password_vault').delete().eq('id', id);
+      if (error) {
+        alert("刪除失敗：" + error.message);
+      } else {
+        alert("已成功刪除該筆紀錄！");
+        fetchVaultFromCloud();
+      }
+    }
+
+    function exportBackup() {
+      const userId = document.getElementById("userId").value;
+      if (!userId) {
+        alert("請先輸入帳號標籤 (User ID) 再進行匯出！");
+        return;
+      }
+      if (vault.length === 0) {
+        alert("目前沒有任何雲端資料可供匯出，請先點擊「從雲端載入/同步資料」！");
+        return;
+      }
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(vault, null, 2));
+      const downloadAnchor = document.createElement('a');
+      const today = new Date().toISOString().split('T')[0];
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `password_backup_${userId}_${today}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importBackup(event) {
+      const userId = document.getElementById("userId").value;
+      if (!userId) {
+        alert("請先輸入你的帳號標籤 (User ID)，再選擇要匯入的備份檔！");
+        return;
+      }
+
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          if (!Array.isArray(importedData)) {
+            alert("備份檔格式不正確！");
+            return;
+          }
+
+          if (!confirm(`確定要將備份檔中的 ${importedData.length} 筆資料寫入帳號【${userId}】的雲端庫嗎？`)) {
+            return;
+          }
+
+          const rowsToInsert = importedData.map(item => ({
+            user_id: userId,
+            site_name: item.site_name,
+            category_name: item.category_name || item.decryptedCategory || "未分類",
+            account_name: item.account_name || item.decryptedAccount || "",
+            note_name: item.note_name || "",
+            ciphertext_hex: item.ciphertext_hex,
+            ciphertext_array: item.ciphertext_array,
+            salt: item.salt,
+            iv: item.iv
+          }));
+
+          const { data, error } = await supabaseClient.from('password_vault').insert(rowsToInsert);
+
+          if (error) {
+            alert("匯入雲端失敗：" + error.message);
+          } else {
+            alert("備份資料成功匯入雲端！");
+            fetchVaultFromCloud();
+          }
+        } catch (err) {
+          alert("讀取檔案失敗：" + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+  </script>
+</body>
+</html>
