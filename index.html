@@ -10,6 +10,13 @@
     body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
     .box { background: #f4f4f4; padding: 15px; margin-bottom: 20px; border-radius: 6px; }
     input, select { width: 88%; padding: 8px; margin: 5px 0 10px 0; }
+    
+    /* 點點遮蔽效果，防止 Chrome 誤判為密碼表單 */
+    .mask-input {
+      -webkit-text-security: disc;
+      text-security: disc;
+    }
+
     button { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; margin-bottom: 5px; }
     button:hover { background: #0056b3; }
     .btn-gen { background: #28a745; }
@@ -128,7 +135,7 @@
   <!-- 1. 帳號驗證與同步區塊 -->
   <div class="box" style="background: #e9ecef;">
     <label><strong>帳號標籤 (User ID)：</strong></label><br>
-    <input type="text" id="userId" placeholder="例如：swcheng929"><br>
+    <input type="text" id="userId" placeholder="例如：swcheng929" autocomplete="off"><br>
     
     <!-- 歷史常用 User ID 標籤清單 -->
     <div style="margin-bottom: 10px;">
@@ -138,7 +145,8 @@
     </div>
 
     <label><strong>Key (主密碼)：</strong></label><br>
-    <input type="password" id="masterPassword" placeholder="解密鑰匙 (主密碼)"><br>
+    <!-- 使用 type="text" 搭配 class="mask-input" 避免觸發 Chrome 密碼表單偵測 -->
+    <input type="text" id="masterPassword" class="mask-input" placeholder="解密鑰匙 (主密碼)" autocomplete="off" spellcheck="false"><br>
     
     <button class="btn-sync" onclick="fetchVaultFromCloud()">🔄 從雲端載入/同步資料</button>
   </div>
@@ -933,7 +941,6 @@
           const isWriteToCloud = confirm(`請問是否要把備份檔中的 ${importedData.length} 筆資料寫入帳號【${userId}】的雲端資料庫嗎？\n\n【確定】= 同步存回雲端\n【取消】= 不寫入雲端，僅在網頁本地端載入顯示`);
 
           if (isWriteToCloud) {
-            // 選擇寫入雲端
             const rowsToInsert = importedData.map(item => ({
               user_id: userId,
               site_name: item.site_name,
@@ -955,7 +962,6 @@
               fetchVaultFromCloud();
             }
           } else {
-            // 選擇不寫入雲端，僅在本地端顯示
             vault = importedData;
             vault.forEach(item => {
               if (item.category_name) addCategoryToDatalist(item.category_name);
