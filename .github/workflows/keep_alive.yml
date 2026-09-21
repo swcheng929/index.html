@@ -1,0 +1,17 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # 設定每 3 天自動執行一次
+    - cron: '0 0 */3 * *'
+  workflow_dispatch: # 允許手動點擊測試
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database
+        run: |
+          curl -X GET 'https://hkvwnpaohiabgziutlcm.supabase.co/rest/v1/password_vault?select=id&limit=1' \
+          -H "apikey: sb_publishable_d0B_2yBcJqx_A20LBPHA-Q_1LkXIPgI" \
+          -H "Authorization: Bearer sb_publishable_d0B_2yBcJqx_A20LBPHA-Q_1LkXIPgI"
