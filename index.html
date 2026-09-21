@@ -639,7 +639,7 @@
     function renderVaultItems(itemsToRender) {
       const listDiv = document.getElementById("vaultList");
       if (vault.length === 0) {
-        listDiv.innerHTML = "目前雲端尚無此帳號標籤的資料。";
+        listDiv.innerHTML = "目前尚無資料可供顯示。";
         return;
       }
 
@@ -930,29 +930,40 @@
             return;
           }
 
-          if (!confirm(`確定要將備份檔中的 ${importedData.length} 筆資料寫入帳號【${userId}】的雲端庫嗎？`)) {
-            return;
-          }
+          const isWriteToCloud = confirm(`請問是否要把備份檔中的 ${importedData.length} 筆資料寫入帳號【${userId}】的雲端資料庫嗎？\n\n【確定】= 同步存回雲端\n【取消】= 不寫入雲端，僅在網頁本地端載入顯示`);
 
-          const rowsToInsert = importedData.map(item => ({
-            user_id: userId,
-            site_name: item.site_name,
-            category_name: item.category_name || item.decryptedCategory || "未分類",
-            account_name: item.account_name || item.decryptedAccount || "",
-            note_name: item.note_name || "",
-            ciphertext_hex: item.ciphertext_hex,
-            ciphertext_array: item.ciphertext_array,
-            salt: item.salt,
-            iv: item.iv
-          }));
+          if (isWriteToCloud) {
+            // 選擇寫入雲端
+            const rowsToInsert = importedData.map(item => ({
+              user_id: userId,
+              site_name: item.site_name,
+              category_name: item.category_name || item.decryptedCategory || "未分類",
+              account_name: item.account_name || item.decryptedAccount || "",
+              note_name: item.note_name || "",
+              ciphertext_hex: item.ciphertext_hex,
+              ciphertext_array: item.ciphertext_array,
+              salt: item.salt,
+              iv: item.iv
+            }));
 
-          const { data, error } = await supabaseClient.from('password_vault').insert(rowsToInsert);
+            const { data, error } = await supabaseClient.from('password_vault').insert(rowsToInsert);
 
-          if (error) {
-            alert("匯入雲端失敗：" + error.message);
+            if (error) {
+              alert("匯入雲端失敗：" + error.message);
+            } else {
+              alert("備份資料成功匯入雲端！");
+              fetchVaultFromCloud();
+            }
           } else {
-            alert("備份資料成功匯入雲端！");
-            fetchVaultFromCloud();
+            // 選擇不寫入雲端，僅在本地端顯示
+            vault = importedData;
+            vault.forEach(item => {
+              if (item.category_name) addCategoryToDatalist(item.category_name);
+              if (item.account_name) addAccountToDatalist(item.account_name);
+            });
+            refreshCategoryFilterList();
+            filterVault();
+            alert("已成功在本地端載入備份檔資料！現在可以輸入 Key 解密查看囉。");
           }
         } catch (err) {
           alert("讀取檔案失敗：" + err.message);
