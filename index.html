@@ -30,6 +30,8 @@
     .btn-edit:hover { background: #e0a800; }
     .btn-backup { background: #6c757d; }
     .btn-backup:hover { background: #5a6268; }
+    .btn-change-key { background: #dc3545; color: white; font-weight: bold; }
+    .btn-change-key:hover { background: #bd2130; }
     
     /* User ID 標籤樣式 */
     .user-tag {
@@ -145,10 +147,10 @@
     </div>
 
     <label><strong>Key (主密碼)：</strong></label><br>
-    <!-- 使用 type="text" 搭配 class="mask-input" 避免觸發 Chrome 密碼表單偵測 -->
     <input type="text" id="masterPassword" class="mask-input" placeholder="解密鑰匙 (主密碼)" autocomplete="off" spellcheck="false"><br>
     
     <button class="btn-sync" onclick="fetchVaultFromCloud()">🔄 從雲端載入/同步資料</button>
+    <button class="btn-change-key" onclick="changeMasterKeyProcess()">⚠️ 安全變更主 Key</button>
   </div>
 
   <!-- 2. 保險箱列表與搜尋過濾器 -->
@@ -977,6 +979,132 @@
       };
       reader.readAsText(file);
       event.target.value = '';
+    }
+
+    /* 高安全級別：一鍵自動重設主 Key 處理邏輯 */
+    async function changeMasterKeyProcess() {
+      const userId = document.getElementById("userId").value.trim();
+      const oldKey = document.getElementById("masterPassword").value;
+
+      if (!userId || !oldKey) {
+        alert("請先輸入當前的【帳號標籤 (User ID)】與【舊 Key (主密碼)】！");
+        return;
+      }
+
+      // 高風險警告確認
+      const isSure = confirm(`🚨 高風險警告：您即將變更 User ID 【${userId}】的全庫主 Key。\n\n系統將自動為您執行【強制自動下載全庫備份】，以確保數據絕對安全。\n\n您確定要繼續嗎？`);
+      if (!isSure) return;
+
+      const newKey = prompt(`🔑 請輸入您想設定的「新 Key (新主密碼)」：`);
+      if (!newKey) {
+        alert("取消變更：新 Key 不能為空。");
+        return;
+      }
+
+      if (newKey === oldKey) {
+        alert("新 Key 不能與舊 Key 相同！");
+        return;
+      }
+
+      const confirmNewKey = prompt("請再次輸入「新 Key」進行雙重確認：");
+      if (newKey !== confirmNewKey) {
+        alert("兩次輸入的新 Key 不相符，取消變更。");
+        return;
+      }
+
+      // 1. 先抓取雲端現有資料
+      const { data: cloudData, error: fetchErr } = await supabaseClient
+        .from('password_vault')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (fetchErr || !cloudData || cloudData.length === 0) {
+        alert("找不到雲端資料或讀取失敗！請確認 User ID 是否正確。");
+        return;
+      }
+
+      // 2.【安全第一關】強制自動下載備份檔 (包含舊加密數據)
+      try {
+        const backupStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cloudData, null, 2));
+        const downloadAnchor = document.createElement('a');
+        const today = new Date().toISOString().split('T')[0];
+        downloadAnchor.setAttribute("href", backupStr);
+        downloadAnchor.setAttribute("download", `AUTO_SAFETY_BACKUP_${userId}_${today}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+      } catch (e) {
+        alert("自動備份失敗，為確保安全取消變更作業！");
+        return;
+      }
+
+      // 3.【安全第二關】抽查試解第一筆資料，驗證舊 Key 是否 100% 正確
+      try {
+        const testItem = cloudData[0];
+        const testSalt = new Uint8Array(testItem.salt);
+        const testIv = new Uint8Array(testItem.iv);
+        const testCipher = new Uint8Array(testItem.ciphertext_array);
+        const testMasterKeyObj = await getMasterKey(oldKey, testSalt);
+        await crypto.subtle.decrypt({ name: "AES-GCM", iv: testIv }, testMasterKeyObj, testCipher);
+      } catch (e) {
+        alert("❌ 驗證失敗：您輸入的【舊 Key】不正確！無法解密數據，已終止變更程序。");
+        return;
+      }
+
+      // 4. 逐筆將資料解密並用新 Key 加密
+      const newRowsToInsert = [];
+      const enc = new TextEncoder();
+
+      for (let i = 0; i < cloudData.length; i++) {
+        const item = cloudData[i];
+        try {
+          const oldSalt = new Uint8Array(item.salt);
+          const oldIv = new Uint8Array(item.iv);
+          const oldCiphertext = new Uint8Array(item.ciphertext_array);
+          const oldMasterKeyObj = await getMasterKey(oldKey, oldSalt);
+          const decryptedBuffer = await crypto.subtle.decrypt({ name: "AES-GCM", iv: oldIv }, oldMasterKeyObj, oldCiphertext);
+          const decryptedJson = new TextDecoder().decode(decryptedBuffer);
+
+          const newSalt = crypto.getRandomValues(new Uint8Array(16));
+          const newIv = crypto.getRandomValues(new Uint8Array(12));
+          const newMasterKeyObj = await getMasterKey(newKey, newSalt);
+
+          const newEncryptedBuffer = await crypto.subtle.encrypt({ name: "AES-GCM", iv: newIv }, newMasterKeyObj, enc.encode(decryptedJson));
+          const newCiphertextArray = Array.from(new Uint8Array(newEncryptedBuffer));
+          const newCiphertextHex = newCiphertextArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+          newRowsToInsert.push({
+            user_id: userId,
+            site_name: item.site_name,
+            category_name: item.category_name,
+            account_name: item.account_name,
+            note_name: item.note_name,
+            ciphertext_hex: newCiphertextHex,
+            ciphertext_array: newCiphertextArray,
+            salt: Array.from(newSalt),
+            iv: Array.from(newIv)
+          });
+        } catch (e) {
+          alert(`解密第 ${i + 1} 筆資料時出錯，已終止程序。已為您儲存安全備份檔於下載資料夾。`);
+          return;
+        }
+      }
+
+      // 5.【安全第三關】寫入新 Key 數據後才清理，保護資料庫完整性
+      const { error: delErr } = await supabaseClient.from('password_vault').delete().eq('user_id', userId);
+      if (delErr) {
+        alert("更新過程中清空舊資料失敗：" + delErr.message);
+        return;
+      }
+
+      const { error: insertErr } = await supabaseClient.from('password_vault').insert(newRowsToInsert);
+      if (insertErr) {
+        alert("寫入新加密資料失敗：" + insertErr.message + "。\n請使用剛才自動下載的備份檔恢復資料！");
+      } else {
+        alert(`🎉 變更成功！已自動完成安全備份，並將 ${newRowsToInsert.length} 筆資料全部改用「新 Key」重新加密儲存至雲端！`);
+        document.getElementById("masterPassword").value = newKey;
+        fetchVaultFromCloud();
+      }
     }
   </script>
 </body>
