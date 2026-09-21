@@ -147,7 +147,8 @@
     </div>
 
     <label><strong>Key (主密碼)：</strong></label><br>
-    <input type="text" id="masterPassword" class="mask-input" placeholder="解密鑰匙 (主密碼)" autocomplete="off" spellcheck="false"><br>
+    <!-- 更換 ID 與屬性，並停用自動完成，避開 Chrome 偵測 -->
+    <input type="text" id="vaultSecretKey" name="userKeyField" class="mask-input" placeholder="解密鑰匙 (主密碼)" autocomplete="new-password" spellcheck="false"><br>
     
     <button class="btn-sync" onclick="fetchVaultFromCloud()">🔄 從雲端載入/同步資料</button>
     <button class="btn-change-key" onclick="changeMasterKeyProcess()">⚠️ 安全變更主 Key</button>
@@ -537,7 +538,7 @@
 
     async function saveSecretToCloud() {
       const userId = document.getElementById("userId").value;
-      const masterPass = document.getElementById("masterPassword").value;
+      const masterPass = document.getElementById("vaultSecretKey").value;
       const category = document.getElementById("categoryName").value || "未分類";
       const site = document.getElementById("siteName").value;
       const account = document.getElementById("accountName").value;
@@ -684,7 +685,7 @@
     }
 
     async function revealSecret(index) {
-      const masterPass = document.getElementById("masterPassword").value;
+      const masterPass = document.getElementById("vaultSecretKey").value;
       const item = vault[index];
 
       if (!masterPass) {
@@ -802,7 +803,7 @@
     }
 
     async function updateCloudItem(index) {
-      const masterPass = document.getElementById("masterPassword").value;
+      const masterPass = document.getElementById("vaultSecretKey").value;
       const item = vault[index];
       
       const newCat = document.getElementById(`editCat-${index}`).value || "未分類";
@@ -984,7 +985,7 @@
     /* 高安全級別：一鍵自動重設主 Key 處理邏輯 */
     async function changeMasterKeyProcess() {
       const userId = document.getElementById("userId").value.trim();
-      const oldKey = document.getElementById("masterPassword").value;
+      const oldKey = document.getElementById("vaultSecretKey").value;
 
       if (!userId || !oldKey) {
         alert("請先輸入當前的【帳號標籤 (User ID)】與【舊 Key (主密碼)】！");
@@ -1102,7 +1103,7 @@
         alert("寫入新加密資料失敗：" + insertErr.message + "。\n請使用剛才自動下載的備份檔恢復資料！");
       } else {
         alert(`🎉 變更成功！已自動完成安全備份，並將 ${newRowsToInsert.length} 筆資料全部改用「新 Key」重新加密儲存至雲端！`);
-        document.getElementById("masterPassword").value = newKey;
+        document.getElementById("vaultSecretKey").value = newKey;
         fetchVaultFromCloud();
       }
     }
