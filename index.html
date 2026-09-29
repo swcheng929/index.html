@@ -32,7 +32,20 @@
     .btn-backup:hover { background: #5a6268; }
     .btn-change-key { background: #dc3545; color: white; font-weight: bold; }
     .btn-change-key:hover { background: #bd2130; }
+    .btn-toggle-all { background: #28a745; font-size: 13px; margin-left: 10px; }
+    .btn-toggle-all:hover { background: #218838; }
     
+    /* 折疊標題樣式 */
+    .toggle-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0;
+    }
+    .toggle-header:hover { color: #007bff; }
+
     /* User ID 標籤樣式 */
     .user-tag {
       background: #6c757d;
@@ -147,7 +160,6 @@
     </div>
 
     <label><strong>Key (主密碼)：</strong></label><br>
-    <!-- 更換 ID 與屬性，並停用自動完成，避開 Chrome 偵測 -->
     <input type="text" id="vaultSecretKey" name="userKeyField" class="mask-input" placeholder="解密鑰匙 (主密碼)" autocomplete="new-password" spellcheck="false"><br>
     
     <button class="btn-sync" onclick="fetchVaultFromCloud()">🔄 從雲端載入/同步資料</button>
@@ -156,7 +168,11 @@
 
   <!-- 2. 保險箱列表與搜尋過濾器 -->
   <div class="box">
-    <h3>雲端保險箱紀錄</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <h3 style="margin: 0;">雲端保險箱紀錄</h3>
+      <!-- 顯示/隱藏全庫按鈕，輸入 Key 前預設隱藏 -->
+      <button id="toggleAllBtn" class="btn-toggle-all" style="display: none;" onclick="toggleAllSecrets()">👁️ 顯示全部內容</button>
+    </div>
     
     <button class="btn-backup" onclick="exportBackup()">📥 匯出備份檔 (.json)</button>
     <button class="btn-backup" onclick="document.getElementById('importFile').click()">📤 匯入備份檔</button>
@@ -176,56 +192,60 @@
     <div id="vaultList">請先輸入帳號標籤與 Key，並點擊「從雲端載入/同步資料」。</div>
   </div>
 
-  <!-- 3. 新增資料區塊 -->
+  <!-- 3. 新增資料區塊 (圖二：改為可點擊展開/收合的 Icon 區塊) -->
   <div class="box">
-    <h3>新增網站帳密或私密資料</h3>
-    
-    <label>1. 類型 (分類)：</label><br>
-    <input type="text" id="categoryName" list="categoryOptions" placeholder="請選擇或手動輸入新類型"><br>
-    <datalist id="categoryOptions">
-      <option value="雲端帳號"></option>
-      <option value="社群軟體"></option>
-      <option value="Gogoro相關"></option>
-      <option value="銀行/金融/保險/支付"></option>
-      <option value="影音娛樂"></option>
-      <option value="購物"></option>
-      <option value="旅遊網站(航司/飯店/住房網/其他)"></option>
-      <option value="個人資料、地址備忘 或 重要證件"></option>
-      <option value="其他"></option>
-    </datalist>
+    <h3 class="toggle-header" onclick="toggleAddSection()">
+      <span>➕ 新增網站帳密或私密資料</span>
+      <span id="addSectionIcon" style="font-size: 16px;">▶ 展開</span>
+    </h3>
 
-    <label>2. 網頁名稱 / 資料標題：</label><br>
-    <input type="text" id="siteName" placeholder="例如：Google, FB, HTC, 家中英文地址"><br>
-    
-    <label>3. 帳號 / ID：</label><br>
-    <input type="text" id="accountName" list="accountOptions" placeholder="請選擇常用帳號或手動輸入新帳號/ID"><br>
-    <datalist id="accountOptions">
-      <!-- 系統會自動將歷史輸入過的帳號新增至這裡 -->
-    </datalist>
+    <div id="addSectionContent" style="display: none; margin-top: 15px;">
+      <label>1. 類型 (分類)：</label><br>
+      <input type="text" id="categoryName" list="categoryOptions" placeholder="請選擇或手動輸入新類型"><br>
+      <datalist id="categoryOptions">
+        <option value="雲端帳號"></option>
+        <option value="社群軟體"></option>
+        <option value="Gogoro相關"></option>
+        <option value="銀行/金融/保險/支付"></option>
+        <option value="影音娛樂"></option>
+        <option value="購物"></option>
+        <option value="旅遊網站(航司/飯店/住房網/其他)"></option>
+        <option value="個人資料、地址備忘 或 重要證件"></option>
+        <option value="其他"></option>
+      </datalist>
 
-    <label>4. 註解 / 備註：</label><br>
-    <input type="text" id="noteName" placeholder="例如：次要備份帳號、公司用、郵遞區號242等"><br>
+      <label>2. 網頁名稱 / 資料標題：</label><br>
+      <input type="text" id="siteName" placeholder="例如：Google, FB, HTC, 家中英文地址"><br>
+      
+      <label>3. 帳號 / ID：</label><br>
+      <input type="text" id="accountName" list="accountOptions" placeholder="請選擇常用帳號或手動輸入新帳號/ID"><br>
+      <datalist id="accountOptions">
+        <!-- 系統會自動將歷史輸入過的帳號新增至這裡 -->
+      </datalist>
 
-    <label>5. 密碼 (高強度加密)：</label><br>
-    <input type="text" id="secretPassword" placeholder="可手動輸入(支援空格與長地址)或點擊按鈕產生" oninput="checkPasswordStrength()">
-    
-    <!-- 按鈕並排：產生強密碼 -> 產生中強密碼 -> 複製密碼 -> 加密並同步至雲端 -->
-    <div class="btn-group">
-      <button type="button" class="btn-gen" onclick="generateRandomPassword('secretPassword')">🎲 產生強密碼</button>
-      <button type="button" class="btn-gen-med" onclick="generateMediumPassword('secretPassword')">🎲 產生中強密碼</button>
-      <button type="button" class="btn-copy" onclick="copyInputPassword()">📋 複製密碼</button>
-      <button type="button" onclick="saveSecretToCloud()">☁️ 加密並同步至雲端</button>
+      <label>4. 註解 / 備註：</label><br>
+      <input type="text" id="noteName" placeholder="例如：次要備份帳號、公司用、郵遞區號242等"><br>
+
+      <label>5. 密碼 (高強度加密)：</label><br>
+      <input type="text" id="secretPassword" placeholder="可手動輸入(支援空格與長地址)或點擊按鈕產生" oninput="checkPasswordStrength()">
+      
+      <div class="btn-group">
+        <button type="button" class="btn-gen" onclick="generateRandomPassword('secretPassword')">🎲 產生強密碼</button>
+        <button type="button" class="btn-gen-med" onclick="generateMediumPassword('secretPassword')">🎲 產生中強密碼</button>
+        <button type="button" class="btn-copy" onclick="copyInputPassword()">📋 複製密碼</button>
+        <button type="button" onclick="saveSecretToCloud()">☁️ 加密並同步至雲端</button>
+      </div>
+
+      <ul class="rules-list">
+        <li id="rule-upper" class="invalid">Uppercase letter (大寫字母)</li>
+        <li id="rule-lower" class="invalid">Lowercase letter (小寫字母)</li>
+        <li id="rule-number" class="invalid">Number (數字)</li>
+        <li id="rule-special" class="invalid">Special character (@!#$%*)</li>
+        <li id="rule-length" class="invalid">8 characters or more (至少 8 位數)</li>
+        <li id="rule-repeat" class="invalid">無連續三個相同的字元 (如 aaa, 111)</li>
+        <li id="rule-sequential" class="invalid">無連續順序的英文或數字 (如 abc, 123)</li>
+      </ul>
     </div>
-
-    <ul class="rules-list">
-      <li id="rule-upper" class="invalid">Uppercase letter (大寫字母)</li>
-      <li id="rule-lower" class="invalid">Lowercase letter (小寫字母)</li>
-      <li id="rule-number" class="invalid">Number (數字)</li>
-      <li id="rule-special" class="invalid">Special character (@!#$%*)</li>
-      <li id="rule-length" class="invalid">8 characters or more (至少 8 位數)</li>
-      <li id="rule-repeat" class="invalid">無連續三個相同的字元 (如 aaa, 111)</li>
-      <li id="rule-sequential" class="invalid">無連續順序的英文或數字 (如 abc, 123)</li>
-    </ul>
   </div>
 
   <script>
@@ -236,6 +256,7 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let vault = [];
+    let isAllRevealed = false; // 紀錄全庫是否展開狀態
     let savedAccounts = new Set();
     let savedCategories = new Set([
       "雲端帳號", "社群軟體", "Gogoro相關", "銀行/金融/保險/支付", 
@@ -246,6 +267,18 @@
     window.addEventListener('DOMContentLoaded', () => {
       renderUserTags();
     });
+
+    function toggleAddSection() {
+      const content = document.getElementById("addSectionContent");
+      const icon = document.getElementById("addSectionIcon");
+      if (content.style.display === "none") {
+        content.style.display = "block";
+        icon.textContent = "▼ 收合";
+      } else {
+        content.style.display = "none";
+        icon.textContent = "▶ 展開";
+      }
+    }
 
     function getStoredUserIds() {
       const stored = localStorage.getItem('saved_user_ids');
@@ -624,6 +657,12 @@
         if (item.account_name) addAccountToDatalist(item.account_name);
       });
 
+      // 輸入 Key 且載入成功後顯示一鍵控制按鈕
+      const masterPass = document.getElementById("vaultSecretKey").value;
+      if (masterPass && vault.length > 0) {
+        document.getElementById("toggleAllBtn").style.display = "inline-block";
+      }
+
       refreshCategoryFilterList();
       filterVault();
     }
@@ -673,7 +712,6 @@
             ${noteDisplay}<br><br>
             <button style="width:100%; text-align:center; padding:10px; font-size:14px; font-weight:bold;">🔓 點擊此處解密查看內容</button>
             
-            <!-- 未解密狀態也能直接點擊刪除 -->
             <div style="text-align: right; margin-top: 5px;">
               <button class="btn-delete-outer" onclick="event.stopPropagation(); deleteCloudItem(${item.id})">🗑️ 刪除此筆紀錄</button>
             </div>
@@ -682,14 +720,22 @@
           </div>
         `;
       });
+
+      // 如果當前處於「全部展開」狀態，渲染後自動解密當前篩選內容
+      if (isAllRevealed) {
+        itemsToRender.forEach((item) => {
+          const idx = vault.indexOf(item);
+          revealSecret(idx, true);
+        });
+      }
     }
 
-    async function revealSecret(index) {
+    async function revealSecret(index, isBatch = false) {
       const masterPass = document.getElementById("vaultSecretKey").value;
       const item = vault[index];
 
       if (!masterPass) {
-        alert("請先在最上方輸入 Key (主密碼)！");
+        if (!isBatch) alert("請先在最上方輸入 Key (主密碼)！");
         return;
       }
 
@@ -710,31 +756,47 @@
         item.currentHistory = historyList;
 
         const infoDiv = document.getElementById(`decrypted-${index}`);
-        infoDiv.style.display = "block";
-        infoDiv.innerHTML = `
-          <!-- 帳號與複製帳號按鈕 -->
-          <div class="info-row">
-            <strong>👤 帳號 / ID：</strong> 
-            <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${item.account_name || '無'}</span>
-            ${item.account_name ? `<button class="btn-copy-large" style="background:#17a2b8;" onclick="copyToClipboard('${item.account_name}')">📋 複製帳號</button>` : ''}
-          </div>
+        if (infoDiv) {
+          infoDiv.style.display = "block";
+          infoDiv.innerHTML = `
+            <div class="info-row">
+              <strong>👤 帳號 / ID：</strong> 
+              <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${item.account_name || '無'}</span>
+              ${item.account_name ? `<button class="btn-copy-large" style="background:#17a2b8;" onclick="copyToClipboard('${item.account_name}')">📋 複製帳號</button>` : ''}
+            </div>
 
-          <!-- 密碼與複製內容按鈕 -->
-          <div class="info-row">
-            <strong>🔑 密碼：</strong> 
-            <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${secretText}</span>
-            <button class="btn-copy-large" onclick="copyToClipboard('${secretText}')">📋 複製密碼</button>
-          </div>
+            <div class="info-row">
+              <strong>🔑 密碼：</strong> 
+              <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${secretText}</span>
+              <button class="btn-copy-large" onclick="copyToClipboard('${secretText}')">📋 複製密碼</button>
+            </div>
 
-          <div style="margin-top: 15px;">
-            <button class="btn-edit" onclick="showEditForm(${index}, '${item.category_name || ''}', '${item.site_name || ''}', '${item.account_name || ''}', '${item.note_name || ''}')">✏️ 編輯這筆紀錄</button>
-            <button class="btn-delete-right" onclick="deleteCloudItem(${item.id})">🗑️ 刪除這筆紀錄</button>
-            <div class="clear-both"></div>
-          </div>
-          <div id="edit-box-${index}" class="edit-box" style="display: none;"></div>
-        `;
+            <div style="margin-top: 15px;">
+              <button class="btn-edit" onclick="showEditForm(${index}, '${item.category_name || ''}', '${item.site_name || ''}', '${item.account_name || ''}', '${item.note_name || ''}')">✏️ 編輯這筆紀錄</button>
+              <button class="btn-delete-right" onclick="deleteCloudItem(${item.id})">🗑️ 刪除這筆紀錄</button>
+              <div class="clear-both"></div>
+            </div>
+            <div id="edit-box-${index}" class="edit-box" style="display: none;"></div>
+          `;
+        }
       } catch (e) {
-        alert("解密失敗！Key (主密碼) 不正確。");
+        if (!isBatch) alert("解密失敗！Key (主密碼) 不正確。");
+      }
+    }
+
+    /* 一鍵開關目前篩選出的全部帳密內容 */
+    function toggleAllSecrets() {
+      const btn = document.getElementById("toggleAllBtn");
+      isAllRevealed = !isAllRevealed;
+
+      if (isAllRevealed) {
+        btn.textContent = "🙈 隱藏全部內容";
+        btn.style.background = "#dc3545";
+        filterVault(); // 重新渲染並解密目前搜尋出的項目
+      } else {
+        btn.textContent = "👁️ 顯示全部內容";
+        btn.style.background = "#28a745";
+        filterVault(); // 重新渲染並隱藏
       }
     }
 
@@ -784,14 +846,12 @@
         <label>5. 密碼：</label><br>
         <input type="text" id="editPass-${index}" value="${currentPass}"><br>
         
-        <!-- 包含「更新強密碼」、「更新中強密碼」與「顯示舊密碼」按鈕 -->
         <div style="margin-bottom: 12px;">
           <button type="button" class="btn-gen" onclick="generateRandomPassword('editPass-${index}')">🎲 更新強密碼</button>
           <button type="button" class="btn-gen-med" onclick="generateMediumPassword('editPass-${index}')">🎲 更新中強密碼</button>
           <button type="button" class="btn-backup" onclick="toggleHistoryDisplay(${index})">📜 顯示前3次舊密碼紀錄</button>
         </div>
 
-        <!-- 舊密碼紀錄隱藏區塊 -->
         <div id="history-box-${index}" class="history-box" style="display: none;">
           <strong>前 3 次舊密碼紀錄：</strong>
           ${historyHtml}
@@ -982,7 +1042,6 @@
       event.target.value = '';
     }
 
-    /* 高安全級別：一鍵自動重設主 Key 處理邏輯 */
     async function changeMasterKeyProcess() {
       const userId = document.getElementById("userId").value.trim();
       const oldKey = document.getElementById("vaultSecretKey").value;
@@ -992,7 +1051,6 @@
         return;
       }
 
-      // 高風險警告確認
       const isSure = confirm(`🚨 高風險警告：您即將變更 User ID 【${userId}】的全庫主 Key。\n\n系統將自動為您執行【強制自動下載全庫備份】，以確保數據絕對安全。\n\n您確定要繼續嗎？`);
       if (!isSure) return;
 
@@ -1013,7 +1071,6 @@
         return;
       }
 
-      // 1. 先抓取雲端現有資料
       const { data: cloudData, error: fetchErr } = await supabaseClient
         .from('password_vault')
         .select('*')
@@ -1024,7 +1081,6 @@
         return;
       }
 
-      // 2.【安全第一關】強制自動下載備份檔 (包含舊加密數據)
       try {
         const backupStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cloudData, null, 2));
         const downloadAnchor = document.createElement('a');
@@ -1039,7 +1095,6 @@
         return;
       }
 
-      // 3.【安全第二關】抽查試解第一筆資料，驗證舊 Key 是否 100% 正確
       try {
         const testItem = cloudData[0];
         const testSalt = new Uint8Array(testItem.salt);
@@ -1052,7 +1107,6 @@
         return;
       }
 
-      // 4. 逐筆將資料解密並用新 Key 加密
       const newRowsToInsert = [];
       const enc = new TextEncoder();
 
@@ -1091,7 +1145,6 @@
         }
       }
 
-      // 5.【安全第三關】寫入新 Key 數據後才清理，保護資料庫完整性
       const { error: delErr } = await supabaseClient.from('password_vault').delete().eq('user_id', userId);
       if (delErr) {
         alert("更新過程中清空舊資料失敗：" + delErr.message);
