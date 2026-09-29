@@ -251,7 +251,7 @@
   <script>
     // 1. 正確宣告 Supabase 連線資訊
     const SUPABASE_URL = "https://hkvwnpaohiabgziutlcm.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_dOB_2yBcJqx_A20LBPHA-Q_1LkXIPgI"; 
+    const SUPABASE_ANON_KEY = "sb_publishable_dOB_2yBcJqx_A20LBPHA-Q_1LkXIPgI";  
     
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -694,7 +694,7 @@
         return;
       }
 
-      // 核心邏輯：若無主動搜尋/篩選，且未按下「顯示全部內容」，則下方預設空白不列出任何卡片
+      // 若無搜尋/篩選且未按「顯示全部內容」，預設隱藏提示
       if (!hasActiveSearch && !isAllRevealed) {
         listDiv.innerHTML = "<div style='color: #666; text-align: center; padding: 20px; background: white; border-radius: 6px; border: 1px dashed #ccc;'>🔒 資料已載入完畢，請點擊上方「👁️ 顯示全部內容」或使用搜尋/篩選查看紀錄。</div>";
         return;
@@ -710,9 +710,15 @@
         const originalIndex = vault.indexOf(item);
         const categoryBadge = item.category_name ? `<span class="badge">${item.category_name}</span>` : '<span class="badge">未分類</span>';
 
+        /* 核心需求修改：列出卡片時，直接呈現帳號與註解這兩項未加密明文 */
+        const accountDisplay = item.account_name ? `<br><small style="color:#333; font-size: 14px;">👤 帳號: ${item.account_name}</small>` : '';
+        const noteDisplay = item.note_name ? `<br><small style="color:#666; font-size: 13px;">📝 註解: ${item.note_name}</small>` : '';
+
         listDiv.innerHTML += `
           <div class="vault-card" onclick="revealSecret(${originalIndex})">
-            <strong style="font-size: 16px;">🌐 ${item.site_name}</strong> ${categoryBadge}<br><br>
+            <strong style="font-size: 16px;">🌐 ${item.site_name}</strong> ${categoryBadge}
+            ${accountDisplay}
+            ${noteDisplay}<br><br>
             <button style="width:100%; text-align:center; padding:10px; font-size:14px; font-weight:bold;">🔓 點擊此處解密查看內容</button>
             
             <div style="text-align: right; margin-top: 5px;">
@@ -761,10 +767,8 @@
         const infoDiv = document.getElementById(`decrypted-${index}`);
         if (infoDiv) {
           infoDiv.style.display = "block";
-          const noteDisplay = item.note_name ? `<div style="margin-bottom:8px; font-size:13px; color:#555;">📝 註解/備註: ${item.note_name}</div>` : '';
 
           infoDiv.innerHTML = `
-            ${noteDisplay}
             <div class="info-row">
               <strong>👤 帳號 / ID：</strong> 
               <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${item.account_name || '無'}</span>
