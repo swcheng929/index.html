@@ -170,7 +170,7 @@
   <div class="box">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
       <h3 style="margin: 0;">雲端保險箱紀錄</h3>
-      <!-- 顯示/隱藏全庫按鈕，輸入 Key 前預設隱藏 -->
+      <!-- 顯示/隱藏全庫按鈕，載入成功後顯示 -->
       <button id="toggleAllBtn" class="btn-toggle-all" style="display: none;" onclick="toggleAllSecrets()">👁️ 顯示全部內容</button>
     </div>
     
@@ -192,7 +192,7 @@
     <div id="vaultList">請先輸入帳號標籤與 Key，並點擊「從雲端載入/同步資料」。</div>
   </div>
 
-  <!-- 3. 新增資料區塊 (圖二：改為可點擊展開/收合的 Icon 區塊) -->
+  <!-- 3. 新增資料區塊 (可點擊展開/收合的 Icon 區塊) -->
   <div class="box">
     <h3 class="toggle-header" onclick="toggleAddSection()">
       <span>➕ 新增網站帳密或私密資料</span>
@@ -256,7 +256,7 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let vault = [];
-    let isAllRevealed = false; // 紀錄全庫是否展開狀態
+    let isAllRevealed = false; // 紀錄全庫是否主動點擊展開
     let savedAccounts = new Set();
     let savedCategories = new Set([
       "雲端帳號", "社群軟體", "Gogoro相關", "銀行/金融/保險/支付", 
@@ -657,13 +657,13 @@
         if (item.account_name) addAccountToDatalist(item.account_name);
       });
 
-      // 輸入 Key 且載入成功後顯示一鍵控制按鈕
-      const masterPass = document.getElementById("vaultSecretKey").value;
-      if (masterPass && vault.length > 0) {
+      // 載入成功後顯示一鍵控制按鈕
+      if (vault.length > 0) {
         document.getElementById("toggleAllBtn").style.display = "inline-block";
       }
 
       refreshCategoryFilterList();
+      isAllRevealed = false; // 預設處於未展開狀態
       filterVault();
     }
 
@@ -683,13 +683,20 @@
         return matchesKeyword && matchesCategory;
       });
 
-      renderVaultItems(filtered);
+      const hasActiveSearch = (keyword !== "") || (selectedCategory !== "ALL");
+      renderVaultItems(filtered, hasActiveSearch);
     }
 
-    function renderVaultItems(itemsToRender) {
+    function renderVaultItems(itemsToRender, hasActiveSearch) {
       const listDiv = document.getElementById("vaultList");
       if (vault.length === 0) {
         listDiv.innerHTML = "目前尚無資料可供顯示。";
+        return;
+      }
+
+      // 核心邏輯：若無主動搜尋/篩選，且未按下「顯示全部內容」，則下方預設空白不列出任何卡片
+      if (!hasActiveSearch && !isAllRevealed) {
+        listDiv.innerHTML = "<div style='color: #666; text-align: center; padding: 20px; background: white; border-radius: 6px; border: 1px dashed #ccc;'>🔒 資料已載入完畢，請點擊上方「👁️ 顯示全部內容」或使用搜尋/篩選查看紀錄。</div>";
         return;
       }
 
@@ -702,14 +709,10 @@
       itemsToRender.forEach((item) => {
         const originalIndex = vault.indexOf(item);
         const categoryBadge = item.category_name ? `<span class="badge">${item.category_name}</span>` : '<span class="badge">未分類</span>';
-        const accountDisplay = item.account_name ? `<br><small style="color:#333; font-size: 14px;">👤 帳號: ${item.account_name}</small>` : '';
-        const noteDisplay = item.note_name ? `<br><small style="color:#666; font-size: 13px;">📝 註解: ${item.note_name}</small>` : '';
 
         listDiv.innerHTML += `
           <div class="vault-card" onclick="revealSecret(${originalIndex})">
-            <strong style="font-size: 16px;">🌐 ${item.site_name}</strong> ${categoryBadge}
-            ${accountDisplay}
-            ${noteDisplay}<br><br>
+            <strong style="font-size: 16px;">🌐 ${item.site_name}</strong> ${categoryBadge}<br><br>
             <button style="width:100%; text-align:center; padding:10px; font-size:14px; font-weight:bold;">🔓 點擊此處解密查看內容</button>
             
             <div style="text-align: right; margin-top: 5px;">
@@ -721,7 +724,7 @@
         `;
       });
 
-      // 如果當前處於「全部展開」狀態，渲染後自動解密當前篩選內容
+      // 若處於全顯模式，渲染後自動解密當前結果
       if (isAllRevealed) {
         itemsToRender.forEach((item) => {
           const idx = vault.indexOf(item);
@@ -758,7 +761,10 @@
         const infoDiv = document.getElementById(`decrypted-${index}`);
         if (infoDiv) {
           infoDiv.style.display = "block";
+          const noteDisplay = item.note_name ? `<div style="margin-bottom:8px; font-size:13px; color:#555;">📝 註解/備註: ${item.note_name}</div>` : '';
+
           infoDiv.innerHTML = `
+            ${noteDisplay}
             <div class="info-row">
               <strong>👤 帳號 / ID：</strong> 
               <span style="font-family: monospace; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">${item.account_name || '無'}</span>
@@ -784,7 +790,7 @@
       }
     }
 
-    /* 一鍵開關目前篩選出的全部帳密內容 */
+    /* 一鍵開關全庫內容 */
     function toggleAllSecrets() {
       const btn = document.getElementById("toggleAllBtn");
       isAllRevealed = !isAllRevealed;
@@ -792,11 +798,11 @@
       if (isAllRevealed) {
         btn.textContent = "🙈 隱藏全部內容";
         btn.style.background = "#dc3545";
-        filterVault(); // 重新渲染並解密目前搜尋出的項目
+        filterVault();
       } else {
         btn.textContent = "👁️ 顯示全部內容";
         btn.style.background = "#28a745";
-        filterVault(); // 重新渲染並隱藏
+        filterVault();
       }
     }
 
